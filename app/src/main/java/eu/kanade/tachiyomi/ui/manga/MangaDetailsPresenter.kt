@@ -108,13 +108,14 @@ import yokai.util.lang.getString
 class MangaDetailsPresenter(
     val mangaId: Long,
     val sourceManager: SourceManager = Injekt.get(),
-    val preferences: PreferencesHelper = Injekt.get(),
+    override val preferences: PreferencesHelper = Injekt.get(),
     val coverCache: CoverCache = Injekt.get(),
     private val downloadManager: DownloadManager = Injekt.get(),
     private val chapterFilter: ChapterFilter = Injekt.get(),
     private val storageManager: StorageManager = Injekt.get(),
 ) : BaseCoroutinePresenter<MangaDetailsController>(),
-    DownloadQueue.Listener {
+    DownloadQueue.Listener,
+    MangaDetailsData {
     private val getAvailableScanlators: GetAvailableScanlators by injectLazy()
     private val getCategories: GetCategories by injectLazy()
     private val getChapter: GetChapter by injectLazy()
@@ -131,13 +132,14 @@ class MangaDetailsPresenter(
 //    private val currentMangaInternal: MutableStateFlow<Manga?> = MutableStateFlow(null)
 //    val currentManga get() = currentMangaInternal.asStateFlow()
 
-    lateinit var manga: Manga
+    override lateinit var manga: Manga
+        private set
     fun isMangaLateInitInitialized() = ::manga.isInitialized
 
     private val customMangaManager: CustomMangaManager by injectLazy()
     private val mangaShortcutManager: MangaShortcutManager by injectLazy()
 
-    val source: Source by lazy { sourceManager.getOrStub(manga.source) }
+    override val source: Source by lazy { sourceManager.getOrStub(manga.source) }
 
     private lateinit var chapterSort: ChapterSort
     val extension by lazy { (source as? HttpSource)?.getExtension() }
@@ -152,7 +154,7 @@ class MangaDetailsPresenter(
 
     var trackList: List<TrackItem> = emptyList()
 
-    var chapters: List<ChapterItem> = emptyList()
+    override var chapters: List<ChapterItem> = emptyList()
         private set
 
     var allChapters: List<ChapterItem> = emptyList()
@@ -362,7 +364,7 @@ class MangaDetailsPresenter(
     /**
      * Returns the next unread chapter or null if everything is read.
      */
-    fun getNextUnreadChapter(): ChapterItem? {
+    override fun getNextUnreadChapter(): ChapterItem? {
         return chapterSort.getNextUnreadChapter(chapters)
     }
 
@@ -708,7 +710,7 @@ class MangaDetailsPresenter(
 
     private fun isScanlatorFiltered() = manga.filtered_scanlators?.isNotEmpty() == true
 
-    fun currentFilters(): String {
+    override fun currentFilters(): String {
         val filtersId = mutableListOf<StringResource?>()
         filtersId.add(if (manga.readFilter(preferences) == Manga.CHAPTER_SHOW_READ) MR.strings.read else null)
         filtersId.add(if (manga.readFilter(preferences) == Manga.CHAPTER_SHOW_UNREAD) MR.strings.unread else null)
@@ -948,10 +950,10 @@ class MangaDetailsPresenter(
         return destFile
     }
 
-    fun isTracked(): Boolean =
+    override fun isTracked(): Boolean =
         loggedServices.any { service -> tracks.any { it.sync_id == service.id } }
 
-    fun hasTrackers(): Boolean = loggedServices.isNotEmpty()
+    override fun hasTrackers(): Boolean = loggedServices.isNotEmpty()
 
     // Tracking
     private fun setTrackItems() {

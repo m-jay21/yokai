@@ -149,6 +149,7 @@ import yokai.domain.recents.interactor.GetRecents
 import yokai.i18n.MR
 import yokai.presentation.core.Constants
 import yokai.presentation.extension.repo.ExtensionRepoController
+import yokai.presentation.folder.FolderController
 import yokai.presentation.onboarding.OnboardingController
 import yokai.util.lang.getString
 import android.R as AR
@@ -516,6 +517,7 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
         if (router.hasRootController()) {
             nav.selectedItemId =
                 when (router.backstack.firstOrNull()?.controller) {
+                    is FolderController -> R.id.nav_folders
                     is RecentsController -> R.id.nav_recents
                     is BrowseController -> R.id.nav_browse
                     else -> R.id.nav_library
@@ -540,6 +542,7 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
                 setRoot(
                     when (id) {
                         R.id.nav_library -> if (basePreferences.composeLibrary().get()) LibraryComposeController() else LibraryController()
+                        R.id.nav_folders -> FolderController()
                         R.id.nav_recents -> RecentsController()
                         else -> BrowseController()
                     },

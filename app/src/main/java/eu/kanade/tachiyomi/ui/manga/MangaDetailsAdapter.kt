@@ -20,8 +20,11 @@ import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 
 class MangaDetailsAdapter(
-    val controller: MangaDetailsController,
-) : BaseChapterAdapter<IFlexible<*>>(controller) {
+    val host: MangaDetailsHost,
+) : BaseChapterAdapter<IFlexible<*>>(host) {
+
+    /** Manga path convenience constructor. */
+    constructor(controller: MangaDetailsController) : this(controller as MangaDetailsHost)
 
     val preferences: PreferencesHelper by injectLazy()
 
@@ -31,8 +34,10 @@ class MangaDetailsAdapter(
     var items: List<ChapterItem> = emptyList()
         private set
 
-    val delegate: MangaDetailsInterface = controller
-    val presenter = controller.presenter
+    val delegate: MangaDetailsInterface = host
+    val presenter: MangaDetailsData get() = host.detailsData
+    /** Legacy Access used by MangaHeaderHolder expand/collapse animations. */
+    val controller: MangaDetailsHost get() = host
 
     val decimalFormat = DecimalFormat(
         "#.###",
@@ -68,14 +73,14 @@ class MangaDetailsAdapter(
         super.onItemSwiped(position, direction)
         when (direction) {
             ItemTouchHelper.RIGHT -> if (recyclerView.resources.isLTR) {
-                controller.bookmarkChapter(position)
+                host.bookmarkChapter(position)
             } else {
-                controller.toggleReadChapter(position)
+                host.toggleReadChapter(position)
             }
             ItemTouchHelper.LEFT -> if (recyclerView.resources.isLTR) {
-                controller.toggleReadChapter(position)
+                host.toggleReadChapter(position)
             } else {
-                controller.bookmarkChapter(position)
+                host.bookmarkChapter(position)
             }
         }
     }
@@ -83,7 +88,7 @@ class MangaDetailsAdapter(
     override fun onCreateBubbleText(position: Int): String {
         val chapter =
             getItem(position) as? ChapterItem ?: return recyclerView.context.getString(MR.strings.top)
-        return when (val scrollType = presenter.scrollType) {
+        return when (val scrollType = host.scrollType) {
             MangaDetailsPresenter.MULTIPLE_VOLUMES, MangaDetailsPresenter.MULTIPLE_SEASONS -> {
                 val volume = ChapterUtil.getGroupNumber(chapter)
                 if (volume != null) {
@@ -133,7 +138,7 @@ class MangaDetailsAdapter(
     interface MangaHeaderInterface {
         fun coverColor(): Int?
         fun accentColor(): Int?
-        fun mangaPresenter(): MangaDetailsPresenter
+        fun mangaPresenter(): MangaDetailsData
         fun prepareToShareManga()
         fun openInWebView()
         fun startDownloadRange(position: Int)

@@ -1,0 +1,73 @@
+CREATE TABLE folder_chapters(
+    _id INTEGER NOT NULL PRIMARY KEY,
+    folder_id INTEGER NOT NULL,
+    chapter_id INTEGER NOT NULL,
+    FOREIGN KEY(folder_id) REFERENCES folders (_id)
+    ON DELETE CASCADE,
+    FOREIGN KEY(chapter_id) REFERENCES chapters (_id)
+    ON DELETE CASCADE,
+    UNIQUE(folder_id, chapter_id)
+);
+
+deleteByFolderId:
+DELETE FROM folder_chapters
+WHERE folder_id = :folderId;
+
+deleteByFolderAndChapter:
+DELETE FROM folder_chapters
+WHERE folder_id = :folderId AND chapter_id = :chapterId;
+
+insert:
+INSERT INTO folder_chapters(folder_id, chapter_id)
+VALUES (:folderId, :chapterId);
+
+findChapterIdsByFolderId:
+SELECT chapter_id
+FROM folder_chapters
+WHERE folder_id = :folderId;
+
+findFolderIdsByChapterId:
+SELECT folder_id
+FROM folder_chapters
+WHERE chapter_id = :chapterId;
+
+findChaptersWithMangaByFolderId:
+SELECT
+    M._id,
+    M.source,
+    M.url,
+    M.artist,
+    M.author,
+    M.description,
+    M.genre,
+    M.title,
+    M.status,
+    M.thumbnail_url,
+    M.favorite,
+    M.last_update,
+    M.initialized,
+    M.viewer,
+    M.hide_title,
+    M.chapter_flags,
+    M.date_added,
+    M.filtered_scanlators,
+    M.update_strategy,
+    M.cover_last_modified,
+    C._id,
+    C.manga_id,
+    C.url,
+    C.name,
+    C.scanlator,
+    C.read,
+    C.bookmark,
+    C.last_page_read,
+    C.pages_left,
+    C.chapter_number,
+    C.source_order,
+    C.date_fetch,
+    C.date_upload
+FROM folder_chapters AS FC
+JOIN chapters AS C ON FC.chapter_id = C._id
+JOIN mangas AS M ON C.manga_id = M._id
+WHERE FC.folder_id = :folderId
+ORDER BY FC._id ASC;

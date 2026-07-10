@@ -109,6 +109,13 @@ android {
             versionNameSuffix = "-r${commitCount}"
             applicationIdSuffix = ".nightlyYokai"
         }
+        create("yokaij") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks.add("release")
+            versionNameSuffix = "-j${commitCount}"
+            applicationIdSuffix = ".yokaij"
+        }
     }
 
     buildFeatures {
@@ -160,6 +167,7 @@ dependencies {
     debugImplementation(compose.ui.tooling)
     implementation(libs.compose.theme.adapter3)
     implementation(compose.webview)
+    implementation(libs.reorderable)
 
     implementation(libs.flexbox)
 
@@ -183,6 +191,7 @@ dependencies {
     releaseImplementation(libs.chucker.library.no.op)
     "nightlyImplementation"(libs.chucker.library.no.op)
     "betaImplementation"(libs.chucker.library.no.op)
+    "yokaijImplementation"(libs.chucker.library.no.op)
 
     implementation(kotlin("reflect", version = kotlinx.versions.kotlin.get()))
 

@@ -1,6 +1,6 @@
 <div align="center">
 
-<a href="https://github.com/null2264/yokai">
+<a href="https://github.com/m-jay21/yokai">
     <img src="./.github/readme-images/app-icon.webp" alt="Yokai logo" height="200px" width="200px" />
 </a>
 
@@ -10,39 +10,44 @@
 
 <div align="center">
 
-A free and open source manga reader
+A free and open source manga reader — fork with custom **Folders** for multi-series collections
 
-[![Discord: Mihon](https://img.shields.io/discord/1195734228319617024.svg?label=&labelColor=6A7EC2&color=7389D8&logo=discord&logoColor=FFFFFF)](https://discord.gg/mihon)
-[![Mirror: GitLab](https://img.shields.io/badge/mirror-GitLab-orange.svg?labelColor=27303D)](https://gitlab.com/null2264/yokai)
-[![Mirror: git.aap](https://img.shields.io/badge/mirror-git.aap-red.svg?labelColor=27303D)](https://git.aap.my.id/null2264/yokai)
-
-[![CI](https://github.com/null2264/yokai/actions/workflows/build_push.yml/badge.svg?labelColor=27303D)](https://github.com/null2264/yokai/actions/workflows/build_push.yml)
-[![License: Apache-2.0](https://img.shields.io/github/license/null2264/yokai?labelColor=27303D&color=0877d2)](/LICENSE)
-[![Translation status](https://img.shields.io/weblate/progress/yokai?labelColor=27303D&color=946300)](https://hosted.weblate.org/engage/yokai/)
+[![License: Apache-2.0](https://img.shields.io/github/license/m-jay21/yokai?labelColor=27303D&color=0877d2)](/LICENSE)
+[![Upstream: null2264/yokai](https://img.shields.io/badge/upstream-null2264%2Fyokai-blue.svg?labelColor=27303D)](https://github.com/null2264/yokai)
 
 <img src="./.github/readme-images/screens.gif" alt="Yokai screenshots" />
 
 ## Download
 
-[![Yokai Stable](https://img.shields.io/github/v/release/null2264/yokai?maxAge=3600&label=Stable&labelColor=06599d&color=043b69&filter=v*)](https://github.com/null2264/yokai/releases)
-[![Yokai Nightly](https://img.shields.io/github/v/release/null2264/yokai-nightly?maxAge=3600&label=Nightly&labelColor=2c2c47&color=1c1c39&filter=r*)](https://github.com/null2264/yokai-nightly/releases)
+Build from source, or install a local variant such as **YōkaiJ** (`./gradlew :app:installStandardYokaij`).
 
 *Requires Android 6.0 or higher.*
 
-## About Fork
+## About this fork
 
-This fork was created for personal usage, the name Yōkai is chosen in theme of my "paranormal" fork collection, all of them are made for personal purposes, to explore the language used to made them, explore new tech, or simply want to add my own twists that may not accepted by upstream as a PR.
+Personal fork of [null2264/yokai](https://github.com/null2264/yokai) focused on **Folders**: group chapters from multiple series into one place, reorder them freely, and manage them with a details UI that matches the series page (including cover-based theming and tablet layout).
 
-Updates are sporadic, sometime fast, sometime slow.
-
-As of the time of writing, this fork is currently focusing on migrating to a much more modern infrastructure, some features may be added, but most changes are happening behind the scene.
+Also includes folder backup/restore, a **YōkaiJ** side-by-side build variant (release-style, no reader debug overlay), and a Glance widget crash fix on some Samsung devices.
 
 ## Features
 
 <div align="left">
 
 <details open="">
-    <summary><h3>From Yōkai</h3></summary>
+    <summary><h3>From this fork</h3></summary>
+
+* **Folders** — create collections of chapters across different series.
+* Folder details screen aligned with series details (cover palette theming, tablet split layout).
+* Manual chapter reorder with optional free-movement drag handles.
+* Folder metadata (name, description, author/artist, tags, custom cover).
+* Folders included in create/restore backup.
+* **YōkaiJ** build type for a release-style install next to stock Yōkai (`eu.kanade.tachiyomi.yokaij`).
+* Fix for Glance widget startup crash (`SecurityException` on some devices).
+
+</details>
+
+<details open="">
+    <summary><h3>From Yōkai (upstream)</h3></summary>
 
 * NSFW/SFW library filter (taken from [TachiyomiSY](https://github.com/jobobby04/TachiyomiSY)).
 * Fix backup incompatibility with upstream.
@@ -52,7 +57,7 @@ As of the time of writing, this fork is currently focusing on migrating to a muc
 </details>
 
 <details open="">
-    <summary><h3>From upstream (Tachiyomi/Mihon)</h3></summary>
+    <summary><h3>From Tachiyomi / Mihon</h3></summary>
 
 * Local reading of downloaded content.
 * A configurable reader with multiple viewers, reading directions and other settings.
@@ -105,7 +110,7 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 
 <details><summary>Issues</summary>
 
-**Before reporting a new issue, take a look at the [FAQ](https://mihon.app/docs/faq/general), the [changelog](https://github.com/null2264/yokai/releases) and the already opened [issues](https://github.com/null2264/yokai/issues).**
+**Before reporting a new issue, take a look at the [FAQ](https://mihon.app/docs/faq/general) and the already opened [issues](https://github.com/m-jay21/yokai/issues).**
 
 </details>
 
@@ -113,20 +118,17 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 
 * Include version (**Settings → About → Version**).
   * If not latest, try updating, it may have already been solved.
-  * Dev version is equal to the number of commits as seen in the main page.
 * Include steps to reproduce (if not obvious from description).
 * Include screenshot (if needed).
 * If it could be device-dependent, try reproducing on another device (if possible).
 * For large logs use [Pastebin](https://pastebin.com/) (or similar).
 * Don't group unrelated requests into one issue.
-- **DO**: [Example #1](https://git.mihon.tech/tachiyomi/tachiyomi/issues/24), [Example #2](https://git.mihon.tech/tachiyomi/tachiyomi/issues/71).
-- **DON'T**: [Example #1](https://git.mihon.tech/tachiyomi/tachiyomi/issues/75).
 
 </details>
 
 <details><summary>Feature Requests</summary>
 
-* Write a detailed issue, explaning what it should do or how.
+* Write a detailed issue, explaining what it should do or how.
   * Avoid writing just "like X app does"
 * Include screenshot (if needed).
 
@@ -136,7 +138,7 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 
 ### Credits
 
-Thank you to all the people who have contributed!
+Based on [null2264/yokai](https://github.com/null2264/yokai). Thank you to everyone who has contributed upstream.
 
 <a href="https://github.com/null2264/yokai/graphs/contributors">
     <img src="https://contrib.rocks/image?repo=null2264/yokai" alt="Yokai app contributors" title="Yokai app contributors" width="600"/>

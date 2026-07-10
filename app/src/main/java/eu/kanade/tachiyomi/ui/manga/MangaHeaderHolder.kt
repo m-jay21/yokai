@@ -113,7 +113,7 @@ class MangaHeaderHolder(
                         -1,
                     )
                 ) {
-                    (adapter.delegate as MangaDetailsController).binding.swipeRefresh.isEnabled =
+                    adapter.host.binding.swipeRefresh.isEnabled =
                         false
                 }
                 false
@@ -124,7 +124,7 @@ class MangaHeaderHolder(
                 }
                 if (event.actionMasked == MotionEvent.ACTION_UP) {
                     hadSelection = mangaSummary.hasSelection()
-                    (adapter.delegate as MangaDetailsController).binding.swipeRefresh.isEnabled =
+                    adapter.host.binding.swipeRefresh.isEnabled =
                         true
                 }
                 false
@@ -199,7 +199,7 @@ class MangaHeaderHolder(
     private fun expandDesc(animated: Boolean = false) {
         binding ?: return
         if (binding.moreButton.visibility == View.VISIBLE || isTablet) {
-            androidx.transition.TransitionManager.endTransitions(adapter.controller.binding.recycler)
+            androidx.transition.TransitionManager.endTransitions(adapter.host.binding.recycler)
             binding.mangaSummary.maxLines = Integer.MAX_VALUE
             binding.mangaSummary.setTextIsSelectable(true)
             setDescription()
@@ -223,7 +223,7 @@ class MangaHeaderHolder(
                     AR.integer.config_shortAnimTime,
                 ).toLong()
                 androidx.transition.TransitionManager.beginDelayedTransition(
-                    adapter.controller.binding.recycler,
+                    adapter.host.binding.recycler,
                     transition,
                 )
             }
@@ -235,7 +235,7 @@ class MangaHeaderHolder(
         if (isTablet || !canCollapse) return
         binding.moreButtonGroup.isVisible = !isTablet
         if (animated) {
-            androidx.transition.TransitionManager.endTransitions(adapter.controller.binding.recycler)
+            androidx.transition.TransitionManager.endTransitions(adapter.host.binding.recycler)
             val animVector = AnimatedVectorDrawableCompat.create(
                 binding.root.context,
                 R.drawable.anim_expand_less_to_more,
@@ -254,7 +254,7 @@ class MangaHeaderHolder(
                 AR.integer.config_shortAnimTime,
             ).toLong()
             androidx.transition.TransitionManager.beginDelayedTransition(
-                adapter.controller.binding.recycler,
+                adapter.host.binding.recycler,
                 transition,
             )
         }
@@ -273,7 +273,7 @@ class MangaHeaderHolder(
 
     private fun setDescription() {
         if (binding != null) {
-            val desc = adapter.controller.mangaPresenter().manga.description?.replace("<", "&lt;")?.replace(">", "&gt;")?.replace(Regex("""(?m)^\s*-\s*$"""), "\\-")?.replace(Regex("""(?m)^\s*\*\s*$"""), "\\*")
+            val desc = adapter.host.detailsData.manga.description?.replace("<", "&lt;")?.replace(">", "&gt;")?.replace(Regex("""(?m)^\s*-\s*$"""), "\\-")?.replace(Regex("""(?m)^\s*\*\s*$"""), "\\*")
             binding.mangaSummary.movementMethod = LinkMovementMethod.getInstance()
             binding.mangaSummary.text = when {
                 desc.isNullOrBlank() -> itemView.context.getString(MR.strings.no_description)
@@ -342,11 +342,17 @@ class MangaHeaderHolder(
                 expand()
             }
         }
-        binding.mangaSummaryLabel.text = itemView.context.getString(
-            MR.strings.about_this_,
-            manga.seriesType(itemView.context),
-        )
+        binding.mangaSummaryLabel.text = if (adapter.controller.isFolderDetails) {
+            itemView.context.getString(MR.strings.about_this_, itemView.context.getString(MR.strings.folder))
+        } else {
+            itemView.context.getString(
+                MR.strings.about_this_,
+                manga.seriesType(itemView.context),
+            )
+        }
+        applyFolderChromeIfNeeded()
         with(binding.favoriteButton) {
+            if (adapter.controller.isFolderDetails) return@with
             icon = ContextCompat.getDrawable(
                 itemView.context,
                 when {
@@ -373,6 +379,10 @@ class MangaHeaderHolder(
         val tracked = presenter.isTracked() && !item.isLocked
 
         with(binding.trackButton) {
+            if (adapter.controller.isFolderDetails) {
+                isVisible = false
+                return@with
+            }
             isVisible = presenter.hasTrackers()
             text = itemView.context.getString(
                 if (tracked) {
@@ -418,6 +428,8 @@ class MangaHeaderHolder(
                 context.getString(MR.strings.all_chapters_read)
             }
         }
+
+        applyFolderChromeIfNeeded()
 
         val count = presenter.chapters.size
         binding.chaptersTitle.text = itemView.context.getString(MR.plurals.chapters_plural, count, count)
@@ -667,10 +679,24 @@ class MangaHeaderHolder(
         }
     }
 
+    private fun applyFolderChromeIfNeeded() {
+        if (!adapter.controller.isFolderDetails) return
+        binding ?: return
+        binding.favoriteButton.isVisible = false
+        binding.trackButton.isVisible = false
+        binding.webviewButton.isVisible = false
+        binding.shareButton.isVisible = false
+        binding.mangaStatus.isVisible = false
+        binding.mangaSource.isVisible = false
+        val author = binding.mangaAuthor.text?.toString()?.trim()
+        binding.mangaAuthor.isVisible =
+            !author.isNullOrBlank() && !author.equals(binding.title.text?.toString(), ignoreCase = true)
+    }
+
     fun updateCover(manga: Manga) {
         binding ?: return
         if (!manga.initialized) return
-        val drawable = adapter.controller.binding.mangaCoverFull.drawable
+        val drawable = adapter.host.binding.mangaCoverFull.drawable
         binding.mangaCover.loadManga(manga) {
             placeholder(drawable)
             error(drawable)

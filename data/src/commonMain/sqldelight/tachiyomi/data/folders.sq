@@ -1,0 +1,63 @@
+CREATE TABLE folders(
+    _id INTEGER NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    sort INTEGER NOT NULL,
+    chapter_order TEXT NOT NULL,
+    parent_id INTEGER,
+    description TEXT,
+    cover TEXT,
+    author TEXT,
+    artist TEXT,
+    genre TEXT
+);
+
+findAll:
+SELECT *
+FROM folders
+ORDER BY sort;
+
+findRoots:
+SELECT *
+FROM folders
+WHERE parent_id IS NULL
+ORDER BY sort;
+
+findByParentId:
+SELECT *
+FROM folders
+WHERE parent_id = :parentId
+ORDER BY sort;
+
+findById:
+SELECT *
+FROM folders
+WHERE _id = :id;
+
+findAllByChapterId:
+SELECT folders.* FROM folders
+JOIN folder_chapters ON folders._id = folder_chapters.folder_id
+WHERE folder_chapters.chapter_id = :chapterId;
+
+insert:
+INSERT INTO folders (name, sort, chapter_order, parent_id, description, cover, author, artist, genre)
+VALUES (:name, :sort, :chapterOrder, :parentId, :description, :cover, :author, :artist, :genre);
+
+selectLastInsertedRowId:
+SELECT last_insert_rowid();
+
+update:
+UPDATE folders SET
+    name = coalesce(:name, name),
+    sort = coalesce(:sort, sort),
+    chapter_order = coalesce(:chapterOrder, chapter_order),
+    parent_id = CASE WHEN :clearParent = 1 THEN NULL ELSE coalesce(:parentId, parent_id) END,
+    description = coalesce(:description, description),
+    cover = coalesce(:cover, cover),
+    author = coalesce(:author, author),
+    artist = coalesce(:artist, artist),
+    genre = coalesce(:genre, genre)
+WHERE _id = :id;
+
+delete:
+DELETE FROM folders
+WHERE _id = :id;

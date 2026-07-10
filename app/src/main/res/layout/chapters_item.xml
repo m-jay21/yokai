@@ -96,8 +96,22 @@
             android:layout_width="54dp"
             android:layout_height="0dp"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/reorder"
             app:layout_constraintTop_toTopOf="parent" />
+
+        <ImageView
+            android:id="@+id/reorder"
+            android:layout_width="40dp"
+            android:layout_height="0dp"
+            android:visibility="gone"
+            android:contentDescription="@string/reorder"
+            android:scaleType="center"
+            app:tint="?attr/colorOnBackground"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:srcCompat="@drawable/ic_drag_handle_24dp"
+            tools:visibility="visible" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 </FrameLayout>

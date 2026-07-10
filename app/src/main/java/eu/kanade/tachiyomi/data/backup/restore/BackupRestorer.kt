@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import eu.kanade.tachiyomi.data.backup.BackupNotifier
 import eu.kanade.tachiyomi.data.backup.restore.restorers.CategoriesBackupRestorer
+import eu.kanade.tachiyomi.data.backup.restore.restorers.FoldersBackupRestorer
 import eu.kanade.tachiyomi.data.backup.restore.restorers.MangaBackupRestorer
 import eu.kanade.tachiyomi.data.backup.restore.restorers.PreferenceBackupRestorer
 import eu.kanade.tachiyomi.util.BackupUtil
@@ -20,6 +21,7 @@ class BackupRestorer(
     val context: Context,
     val notifier: BackupNotifier,
     private val categoriesBackupRestorer: CategoriesBackupRestorer = CategoriesBackupRestorer(),
+    private val foldersBackupRestorer: FoldersBackupRestorer = FoldersBackupRestorer(),
     private val mangaBackupRestorer: MangaBackupRestorer = MangaBackupRestorer(),
     private val preferenceBackupRestorer: PreferenceBackupRestorer = PreferenceBackupRestorer(context),
 ) {
@@ -51,7 +53,7 @@ class BackupRestorer(
     private suspend fun performRestore(uri: Uri) {
         val backup = BackupUtil.decodeBackup(context, uri)
 
-        restoreAmount = backup.backupManga.size + 3 // +3 for categories, app prefs, source prefs
+        restoreAmount = backup.backupManga.size + 3 + if (backup.backupFolders.isNotEmpty()) 1 else 0
 
         sourceMapping = backup.backupSources.associate { it.sourceId to it.name }
 
@@ -91,6 +93,14 @@ class BackupRestorer(
                         errors.add(Date() to "${manga.title} [$sourceName]: ${e.message}")
                     },
                 )
+            }
+
+            if (backup.backupFolders.isNotEmpty()) {
+                ensureActive()
+                foldersBackupRestorer.restoreFolders(backup.backupFolders) {
+                    restoreProgress += 1
+                    showRestoreProgress(restoreProgress, restoreAmount, context.getString(MR.strings.folders))
+                }
             }
         }
         // TODO: optionally trigger online library + tracker update

@@ -247,6 +247,19 @@
     <string name="search_tips_show_periodically">Search tips will show up periodically. Long press the suggestion to search it.</string>
     <string name="enable_chapter_swipe_action">Enable chapter swipe action</string>
 
+    <!-- Folders -->
+    <string name="folders">Folders</string>
+    <string name="folder">folder</string>
+    <string name="information_empty_folders">Nothing added to folders yet</string>
+    <string name="add_to_folder">Add to folder</string>
+    <string name="new_folder">New folder</string>
+    <string name="folder_name">Folder name</string>
+    <string name="added_to_folder">Added to folder</string>
+    <string name="new_subfolder">New subfolder</string>
+    <string name="edit_folder_details">Edit folder details</string>
+    <string name="genres">Genres</string>
+    <string name="free_movement">Free movement</string>
+
     <!-- Recents -->
     <string name="recents">Recents</string>
     <string name="updates_and_history">Updates &amp; history</string>

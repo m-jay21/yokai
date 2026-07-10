@@ -1,0 +1,17 @@
+CREATE TABLE folders(
+    _id INTEGER NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    sort INTEGER NOT NULL,
+    chapter_order TEXT NOT NULL
+);
+
+CREATE TABLE folder_chapters(
+    _id INTEGER NOT NULL PRIMARY KEY,
+    folder_id INTEGER NOT NULL,
+    chapter_id INTEGER NOT NULL,
+    FOREIGN KEY(folder_id) REFERENCES folders (_id)
+    ON DELETE CASCADE,
+    FOREIGN KEY(chapter_id) REFERENCES chapters (_id)
+    ON DELETE CASCADE,
+    UNIQUE(folder_id, chapter_id)
+);

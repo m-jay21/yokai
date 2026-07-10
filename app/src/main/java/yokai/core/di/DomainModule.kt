@@ -4,6 +4,7 @@ import org.koin.dsl.module
 import yokai.data.category.CategoryRepositoryImpl
 import yokai.data.chapter.ChapterRepositoryImpl
 import yokai.data.extension.repo.ExtensionRepoRepositoryImpl
+import yokai.data.folder.FolderRepositoryImpl
 import yokai.data.history.HistoryRepositoryImpl
 import yokai.data.library.custom.CustomMangaRepositoryImpl
 import yokai.data.manga.MangaRepositoryImpl
@@ -15,6 +16,12 @@ import yokai.domain.category.interactor.GetCategories
 import yokai.domain.category.interactor.InsertCategories
 import yokai.domain.category.interactor.SetMangaCategories
 import yokai.domain.category.interactor.UpdateCategories
+import yokai.domain.folder.FolderRepository
+import yokai.domain.folder.interactor.DeleteFolder
+import yokai.domain.folder.interactor.GetFolders
+import yokai.domain.folder.interactor.InsertFolder
+import yokai.domain.folder.interactor.SetFolderChapters
+import yokai.domain.folder.interactor.UpdateFolder
 import yokai.domain.chapter.ChapterRepository
 import yokai.domain.chapter.interactor.DeleteChapter
 import yokai.domain.chapter.interactor.GetAvailableScanlators
@@ -61,6 +68,13 @@ fun domainModule() = module {
     factory { GetCategories(get()) }
     factory { InsertCategories(get()) }
     factory { UpdateCategories(get()) }
+
+    single<FolderRepository> { FolderRepositoryImpl(get()) }
+    factory { GetFolders(get()) }
+    factory { InsertFolder(get()) }
+    factory { UpdateFolder(get()) }
+    factory { DeleteFolder(get()) }
+    factory { SetFolderChapters(get()) }
 
     single<ExtensionRepoRepository> { ExtensionRepoRepositoryImpl(get()) }
     factory { CreateExtensionRepo(get()) }

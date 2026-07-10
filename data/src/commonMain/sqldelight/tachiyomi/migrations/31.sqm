@@ -1,0 +1,5 @@
+ALTER TABLE folders ADD COLUMN description TEXT;
+ALTER TABLE folders ADD COLUMN cover TEXT;
+ALTER TABLE folders ADD COLUMN author TEXT;
+ALTER TABLE folders ADD COLUMN artist TEXT;
+ALTER TABLE folders ADD COLUMN genre TEXT;

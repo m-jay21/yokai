@@ -23,7 +23,10 @@ import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.text.InputType
 import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.annotation.ColorInt
@@ -64,6 +67,7 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.coil.getBestColor
 import eu.kanade.tachiyomi.data.database.models.Category
 import eu.kanade.tachiyomi.data.database.models.Chapter
+import eu.kanade.tachiyomi.data.database.models.Folder
 import eu.kanade.tachiyomi.data.database.models.seriesType
 import eu.kanade.tachiyomi.data.database.models.vibrantCoverColor
 import eu.kanade.tachiyomi.data.download.DownloadJob
@@ -135,6 +139,7 @@ import eu.kanade.tachiyomi.util.view.setMessage
 import eu.kanade.tachiyomi.util.view.setNegativeButton
 import eu.kanade.tachiyomi.util.view.setOnQueryTextChangeListener
 import eu.kanade.tachiyomi.util.view.setPositiveButton
+import eu.kanade.tachiyomi.util.view.setTitle
 import eu.kanade.tachiyomi.util.view.setStyle
 import eu.kanade.tachiyomi.util.view.setTextColorAlpha
 import eu.kanade.tachiyomi.util.view.snack
@@ -148,6 +153,10 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
+import uy.kohesive.injekt.injectLazy
+import yokai.domain.folder.interactor.GetFolders
+import yokai.domain.folder.interactor.InsertFolder
+import yokai.domain.folder.interactor.SetFolderChapters
 import yokai.domain.manga.models.cover
 import yokai.i18n.MR
 import yokai.presentation.core.Constants
@@ -159,10 +168,15 @@ class MangaDetailsController :
     FlexibleAdapter.OnItemClickListener,
     FlexibleAdapter.OnItemLongClickListener,
     ActionMode.Callback,
-    MangaDetailsAdapter.MangaDetailsInterface,
+    MangaDetailsHost,
     SmallToolbarInterface,
     HingeSupportedController,
     FlexibleAdapter.OnItemMoveListener {
+
+    override val detailsData: MangaDetailsData
+        get() = presenter
+    override val scrollType: Int
+        get() = presenter.scrollType
 
     constructor(
         manga: Manga?,
@@ -206,6 +220,9 @@ class MangaDetailsController :
     private var headerColor: Int? = null
     private var toolbarIsColored = false
     private var snack: Snackbar? = null
+    private val getFolders: GetFolders by injectLazy()
+    private val insertFolder: InsertFolder by injectLazy()
+    private val setFolderChapters: SetFolderChapters by injectLazy()
     val shouldLockIfNeeded: Boolean
     val fromCatalogue = args.getBoolean(FROM_CATALOGUE_EXTRA, false)
     private var trackingBottomSheet: TrackingBottomSheet? = null
@@ -1005,6 +1022,11 @@ class MangaDetailsController :
                 R.drawable.ic_eye_off_range_24dp,
                 MR.strings.mark_range_as_unread,
             ),
+            MaterialMenuSheet.MenuSheetItem(
+                5,
+                R.drawable.ic_folder_24dp,
+                MR.strings.add_to_folder,
+            ),
         )
         if (presenter.getChapterUrl(item.chapter) != null) {
             items.add(
@@ -1027,10 +1049,82 @@ class MangaDetailsController :
                     2 -> startReadRange(position, RangeMode.Read)
                     3 -> startReadRange(position, RangeMode.Unread)
                     4 -> openChapterInWebView(item)
+                    5 -> addChapterToFolder(item)
                 }
                 true
             }
         menuSheet.show()
+    }
+
+    private fun addChapterToFolder(item: ChapterItem) {
+        val chapterId = item.chapter.id ?: return
+        viewScope.launchIO {
+            val folders = getFolders.await()
+            withUIContext {
+                val activity = activity ?: return@withUIContext
+                val newFolderLabel = activity.getString(MR.strings.new_folder)
+                val labels = folders.map { it.name }.toTypedArray() + newFolderLabel
+                activity.materialAlertDialog()
+                    .setTitle(MR.strings.add_to_folder)
+                    .setItems(labels) { _, which ->
+                        if (which == folders.size) {
+                            promptNewFolder(chapterId)
+                        } else {
+                            addChapterToExistingFolder(folders[which].id!!.toLong(), chapterId)
+                        }
+                    }
+                    .setNegativeButton(AR.string.cancel, null)
+                    .show()
+            }
+        }
+    }
+
+    private fun promptNewFolder(chapterId: Long) {
+        val activity = activity ?: return
+        val editText = EditText(activity).apply {
+            hint = activity.getString(MR.strings.folder_name)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+        }
+        val container = FrameLayout(activity).apply {
+            val padding = 16.dpToPx
+            setPadding(padding, 0, padding, 0)
+            addView(editText)
+        }
+        activity.materialAlertDialog()
+            .setTitle(MR.strings.new_folder)
+            .setView(container)
+            .setPositiveButton(MR.strings.save) { _, _ ->
+                val name = editText.text.toString().trim()
+                if (name.isNotBlank()) createFolderAndAddChapter(name, chapterId)
+            }
+            .setNegativeButton(AR.string.cancel, null)
+            .show()
+    }
+
+    private fun createFolderAndAddChapter(name: String, chapterId: Long) {
+        viewScope.launchIO {
+            val existing = getFolders.await()
+            val match = existing.firstOrNull { it.name.equals(name, ignoreCase = true) }
+            val folderId = match?.id?.toLong() ?: run {
+                val folder = Folder.create(name).apply {
+                    order = (existing.maxOfOrNull { it.order } ?: 0) + 1
+                }
+                insertFolder.await(folder)
+            }
+            if (folderId != null) addChapterMembership(folderId, chapterId)
+        }
+    }
+
+    private fun addChapterToExistingFolder(folderId: Long, chapterId: Long) {
+        viewScope.launchIO { addChapterMembership(folderId, chapterId) }
+    }
+
+    private suspend fun addChapterMembership(folderId: Long, chapterId: Long) {
+        setFolderChapters.add(folderId, chapterId)
+        withUIContext {
+            snack?.dismiss()
+            snack = view?.snack(MR.strings.added_to_folder)
+        }
     }
 
     override fun onActionStateChanged(viewHolder: RecyclerView.ViewHolder?, actionState: Int) {
@@ -1045,7 +1139,7 @@ class MangaDetailsController :
     }
     //endregion
 
-    fun dismissPopup(position: Int) {
+    override fun dismissPopup(position: Int) {
         if (chapterPopupMenu != null && chapterPopupMenu?.first == position) {
             chapterPopupMenu?.second?.dismiss()
             chapterPopupMenu = null
@@ -1065,7 +1159,7 @@ class MangaDetailsController :
         }
     }
 
-    fun bookmarkChapter(position: Int) {
+    override fun bookmarkChapter(position: Int) {
         val item = adapter?.getItem(position) as? ChapterItem ?: return
         val bookmarked = item.bookmark
         bookmarkChapters(listOf(item), !bookmarked)
@@ -1085,7 +1179,7 @@ class MangaDetailsController :
         (activity as? MainActivity)?.setUndoSnackBar(snack)
     }
 
-    fun toggleReadChapter(position: Int) {
+    override fun toggleReadChapter(position: Int) {
         val preferences = presenter.preferences
         val item = adapter?.getItem(position) as? ChapterItem ?: return
         val chapter = item.chapter
@@ -1771,7 +1865,7 @@ class MangaDetailsController :
         snack = view.snack(view.context.getString(MR.strings.added_to_library))
     }
 
-    override fun mangaPresenter(): MangaDetailsPresenter = presenter
+    override fun mangaPresenter(): MangaDetailsData = presenter
 
     /**
      * Copies a string to clipboard

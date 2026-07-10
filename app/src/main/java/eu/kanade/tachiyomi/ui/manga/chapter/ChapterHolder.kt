@@ -47,9 +47,17 @@ class ChapterHolder(
         binding.downloadButton.downloadButton.isVisible = !manga.isLocal() && !isLocked
         localSource = manga.isLocal()
 
+        val canReorder = adapter.host.allowChapterReorder && adapter.host.chapterReorderEnabled
+        binding.reorder.isVisible = canReorder
+        if (canReorder) setDragHandleView(binding.reorder)
+
         ChapterUtil.setTextViewForChapter(binding.chapterTitle, item, hideStatus = isLocked)
 
         val statuses = mutableListOf<String>()
+
+        if (adapter.host.isFolderDetails) {
+            manga.title.takeIf { it.isNotBlank() }?.let { statuses.add(it) }
+        }
 
         ChapterUtil.relativeDate(chapter)?.let { statuses.add(it) }
 
@@ -123,6 +131,14 @@ class ChapterHolder(
     private fun slideAnimation(from: Float, to: Float): ObjectAnimator {
         return ObjectAnimator.ofFloat(binding.frontView, View.TRANSLATION_X, from, to)
             .setDuration(300)
+    }
+
+    override fun onItemReleased(position: Int) {
+        super.onItemReleased(position)
+        if (adapter.host.allowChapterReorder) {
+            val chapterIds = adapter.currentItems.mapNotNull { (it as? ChapterItem)?.chapter?.id }
+            adapter.host.reorderChapters(chapterIds)
+        }
     }
 
     override fun getFrontView(): View {
