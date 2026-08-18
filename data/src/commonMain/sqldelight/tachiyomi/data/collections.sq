@@ -1,0 +1,32 @@
+CREATE TABLE collections(
+    _id INTEGER NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    sort INTEGER NOT NULL
+);
+
+findAll:
+SELECT *
+FROM collections
+ORDER BY sort;
+
+findById:
+SELECT *
+FROM collections
+WHERE _id = :id;
+
+insert:
+INSERT INTO collections (name, sort)
+VALUES (:name, :sort);
+
+selectLastInsertedRowId:
+SELECT last_insert_rowid();
+
+update:
+UPDATE collections SET
+    name = coalesce(:name, name),
+    sort = coalesce(:sort, sort)
+WHERE _id = :id;
+
+delete:
+DELETE FROM collections
+WHERE _id = :id;

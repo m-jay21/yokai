@@ -21,6 +21,7 @@ import android.R as AR
 fun FolderNameDialog(
     title: String,
     initialName: String = "",
+    label: String? = null,
     confirmEnabled: (String) -> Boolean = { it.isNotBlank() && it != initialName },
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
@@ -28,6 +29,7 @@ fun FolderNameDialog(
     var textFieldValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(initialName))
     }
+    val fieldLabel = label ?: mokoStringResource(MR.strings.folder_name)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -36,7 +38,7 @@ fun FolderNameDialog(
             OutlinedTextField(
                 value = textFieldValue,
                 onValueChange = { textFieldValue = it },
-                label = { Text(text = mokoStringResource(MR.strings.folder_name)) },
+                label = { Text(text = fieldLabel) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )

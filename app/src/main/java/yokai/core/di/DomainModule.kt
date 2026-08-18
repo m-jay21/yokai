@@ -3,6 +3,7 @@ package yokai.core.di
 import org.koin.dsl.module
 import yokai.data.category.CategoryRepositoryImpl
 import yokai.data.chapter.ChapterRepositoryImpl
+import yokai.data.collection.CollectionRepositoryImpl
 import yokai.data.extension.repo.ExtensionRepoRepositoryImpl
 import yokai.data.folder.FolderRepositoryImpl
 import yokai.data.history.HistoryRepositoryImpl
@@ -16,6 +17,12 @@ import yokai.domain.category.interactor.GetCategories
 import yokai.domain.category.interactor.InsertCategories
 import yokai.domain.category.interactor.SetMangaCategories
 import yokai.domain.category.interactor.UpdateCategories
+import yokai.domain.collection.CollectionRepository
+import yokai.domain.collection.interactor.DeleteCollection
+import yokai.domain.collection.interactor.GetCollections
+import yokai.domain.collection.interactor.InsertCollection
+import yokai.domain.collection.interactor.SetMangaCollections
+import yokai.domain.collection.interactor.UpdateCollection
 import yokai.domain.folder.FolderRepository
 import yokai.domain.folder.interactor.DeleteFolder
 import yokai.domain.folder.interactor.GetFolders
@@ -75,6 +82,13 @@ fun domainModule() = module {
     factory { UpdateFolder(get()) }
     factory { DeleteFolder(get()) }
     factory { SetFolderChapters(get()) }
+
+    single<CollectionRepository> { CollectionRepositoryImpl(get()) }
+    factory { GetCollections(get()) }
+    factory { InsertCollection(get()) }
+    factory { UpdateCollection(get()) }
+    factory { DeleteCollection(get()) }
+    factory { SetMangaCollections(get()) }
 
     single<ExtensionRepoRepository> { ExtensionRepoRepositoryImpl(get()) }
     factory { CreateExtensionRepo(get()) }

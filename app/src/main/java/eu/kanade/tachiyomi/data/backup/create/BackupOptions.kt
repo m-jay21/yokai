@@ -16,6 +16,7 @@ data class BackupOptions(
     val readManga: Boolean = true,
     val includePrivate: Boolean = false,
     val folders: Boolean = true,
+    val collections: Boolean = true,
 ) {
     fun asBooleanArray() = booleanArrayOf(
         libraryEntries,
@@ -29,6 +30,7 @@ data class BackupOptions(
         readManga,
         includePrivate,
         folders,
+        collections,
     )
 
     companion object {
@@ -44,6 +46,7 @@ data class BackupOptions(
             MR.strings.all_read_manga,
             MR.strings.backup_private_pref,
             MR.strings.folders,
+            MR.strings.collections,
         )
 
         fun getEntries() = persistentListOf(
@@ -93,6 +96,11 @@ data class BackupOptions(
                 setter = { options, enabled -> options.copy(folders = enabled) },
             ),
             Entry(
+                label = MR.strings.collections,
+                getter = BackupOptions::collections,
+                setter = { options, enabled -> options.copy(collections = enabled) },
+            ),
+            Entry(
                 label = MR.strings.app_settings,
                 getter = BackupOptions::appPrefs,
                 setter = { options, enabled -> options.copy(appPrefs = enabled) },
@@ -121,6 +129,7 @@ data class BackupOptions(
             readManga = array.getOrElse(8) { true },
             includePrivate = array.getOrElse(9) { false },
             folders = array.getOrElse(10) { true },
+            collections = array.getOrElse(11) { true },
         )
     }
 

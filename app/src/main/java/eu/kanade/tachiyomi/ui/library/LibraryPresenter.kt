@@ -59,6 +59,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.launch
@@ -74,6 +76,7 @@ import yokai.domain.category.models.CategoryUpdate
 import yokai.domain.chapter.interactor.GetChapter
 import yokai.domain.chapter.interactor.UpdateChapter
 import yokai.domain.chapter.models.ChapterUpdate
+import yokai.domain.collection.interactor.GetCollections
 import yokai.domain.history.interactor.GetHistory
 import yokai.domain.library.LibraryPreferences
 import yokai.domain.manga.interactor.GetLibraryManga
@@ -105,6 +108,7 @@ class LibraryPresenter(
     private val setMangaCategories: SetMangaCategories by injectLazy()
     private val updateCategories: UpdateCategories by injectLazy()
     private val getLibraryManga: GetLibraryManga by injectLazy()
+    private val getCollections: GetCollections by injectLazy()
     private val getChapter: GetChapter by injectLazy()
     private val updateChapter: UpdateChapter by injectLazy()
     private val updateManga: UpdateManga by injectLazy()
@@ -857,6 +861,12 @@ class LibraryPresenter(
 //        return this
 //    }
 
+    private fun collectionMangaIdsFlow(): Flow<Set<Long>?> {
+        val collectionId = (view as? CollectionLibraryController)?.collectionId
+            ?: return flowOf(null)
+        return getCollections.subscribeMangaIds(collectionId).map { it.toSet() }
+    }
+
     /**
      * Library's flow.
      *
@@ -869,8 +879,19 @@ class LibraryPresenter(
             getLibraryManga.subscribe().retry(1) { e -> e is NullPointerException },
             getPreferencesFlow(),
             forceUpdateEvent.receiveAsFlow(),
-        ) { dbCategories, libraryMangaList, prefs, _ ->
+            collectionMangaIdsFlow(),
+        ) { dbCategories, libraryMangaList, prefs, _, memberIds ->
             groupType = prefs.groupType
+            if (memberIds != null && groupType == BY_DEFAULT) {
+                groupType = UNGROUPED
+            }
+
+            val mangaForView = if (memberIds != null) {
+                libraryMangaList.filter { it.manga.id != null && it.manga.id in memberIds }
+                    .distinctBy { it.manga.id }
+            } else {
+                libraryMangaList
+            }
 
             val defaultCategory = createDefaultCategory()
 
@@ -878,7 +899,7 @@ class LibraryPresenter(
             if (groupType <= BY_DEFAULT || !libraryIsGrouped) {
                 getLibraryItems(
                     dbCategories,
-                    libraryMangaList,
+                    mangaForView,
                     prefs.sortingMode,
                     prefs.sortAscending,
                     prefs.showAllCategories,
@@ -887,7 +908,7 @@ class LibraryPresenter(
                 )
             } else {
                 getDynamicLibraryItems(
-                    libraryMangaList,
+                    mangaForView,
                     prefs.sortingMode,
                     prefs.sortAscending,
                     groupType,

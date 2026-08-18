@@ -1,0 +1,37 @@
+CREATE TABLE mangas_collections(
+    _id INTEGER NOT NULL PRIMARY KEY,
+    manga_id INTEGER NOT NULL,
+    collection_id INTEGER NOT NULL,
+    FOREIGN KEY(collection_id) REFERENCES collections (_id)
+    ON DELETE CASCADE,
+    FOREIGN KEY(manga_id) REFERENCES mangas (_id)
+    ON DELETE CASCADE,
+    UNIQUE(manga_id, collection_id)
+);
+
+insert:
+INSERT OR IGNORE INTO mangas_collections(manga_id, collection_id)
+VALUES (:mangaId, :collectionId);
+
+deleteByMangaAndCollection:
+DELETE FROM mangas_collections
+WHERE manga_id = :mangaId AND collection_id = :collectionId;
+
+deleteByCollection:
+DELETE FROM mangas_collections
+WHERE collection_id = :collectionId;
+
+findMangaIdsByCollectionId:
+SELECT manga_id
+FROM mangas_collections
+WHERE collection_id = :collectionId;
+
+findCollectionIdsByMangaId:
+SELECT collection_id
+FROM mangas_collections
+WHERE manga_id = :mangaId;
+
+countByCollectionId:
+SELECT COUNT(*)
+FROM mangas_collections
+WHERE collection_id = :collectionId;

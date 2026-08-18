@@ -11,6 +11,7 @@ import android.content.res.ColorStateList
 import android.os.Build
 import android.os.Bundle
 import android.os.Parcelable
+import android.text.InputType
 import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.Gravity
@@ -24,6 +25,8 @@ import android.view.ViewGroup
 import android.view.ViewPropertyAnimator
 import android.view.ViewTreeObserver
 import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -62,6 +65,7 @@ import eu.davidea.flexibleadapter.items.ISectionable
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.core.preference.Preference
 import eu.kanade.tachiyomi.data.database.models.Category
+import eu.kanade.tachiyomi.data.database.models.LibraryCollection
 import eu.kanade.tachiyomi.data.database.models.LibraryManga
 import eu.kanade.tachiyomi.data.library.LibraryUpdateJob
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
@@ -107,6 +111,7 @@ import eu.kanade.tachiyomi.util.system.launchUI
 import eu.kanade.tachiyomi.util.system.materialAlertDialog
 import eu.kanade.tachiyomi.util.system.openInBrowser
 import eu.kanade.tachiyomi.util.system.rootWindowInsetsCompat
+import eu.kanade.tachiyomi.util.system.withUIContext
 import eu.kanade.tachiyomi.util.view.activityBinding
 import eu.kanade.tachiyomi.util.view.collapse
 import eu.kanade.tachiyomi.util.view.compatToolTipText
@@ -121,6 +126,7 @@ import eu.kanade.tachiyomi.util.view.isSettling
 import eu.kanade.tachiyomi.util.view.scrollViewWith
 import eu.kanade.tachiyomi.util.view.setAction
 import eu.kanade.tachiyomi.util.view.setMessage
+import eu.kanade.tachiyomi.util.view.setNeutralButton
 import eu.kanade.tachiyomi.util.view.setOnQueryTextChangeListener
 import eu.kanade.tachiyomi.util.view.setPositiveButton
 import eu.kanade.tachiyomi.util.view.setStyle
@@ -143,6 +149,10 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import uy.kohesive.injekt.injectLazy
+import yokai.domain.collection.interactor.GetCollections
+import yokai.domain.collection.interactor.InsertCollection
+import yokai.domain.collection.interactor.SetMangaCollections
 import yokai.domain.ui.UiPreferences
 import yokai.i18n.MR
 import yokai.util.lang.getString
@@ -193,7 +203,7 @@ open class LibraryController(
     private var query = ""
 
     val isSubClass: Boolean
-        get() = this is FilteredLibraryController
+        get() = this is FilteredLibraryController || this is CollectionLibraryController
 
     /**
      * Currently selected mangas.
@@ -210,6 +220,10 @@ open class LibraryController(
     private var lastItem: IFlexible<*>? = null
 
     override var presenter = LibraryPresenter()
+
+    private val getCollections: GetCollections by injectLazy()
+    private val insertCollection: InsertCollection by injectLazy()
+    private val setMangaCollections: SetMangaCollections by injectLazy()
 
     private var observeLater: Boolean = false
     var searchItem = SearchGlobalItem()
@@ -2030,9 +2044,13 @@ open class LibraryController(
         val migrationItem = menu.findItem(R.id.action_migrate)
         val shareItem = menu.findItem(R.id.action_share)
         val categoryItem = menu.findItem(R.id.action_move_to_category)
+        val addToCollectionItem = menu.findItem(R.id.action_add_to_collection)
+        val removeFromCollectionItem = menu.findItem(R.id.action_remove_from_collection)
         categoryItem.isVisible = presenter.isCategoryMoreThanOne()
         migrationItem.isVisible = selectedMangas.any { it.source != LocalSource.ID }
         shareItem.isVisible = migrationItem.isVisible
+        addToCollectionItem?.isVisible = true
+        removeFromCollectionItem?.isVisible = this is CollectionLibraryController
         if (count == 0) {
             destroyActionModeIfNeeded()
         } else {
@@ -2045,6 +2063,8 @@ open class LibraryController(
     override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.action_move_to_category -> showChangeMangaCategoriesSheet()
+            R.id.action_add_to_collection -> showAddToCollectionSheet()
+            R.id.action_remove_from_collection -> removeSelectedFromCollection()
             R.id.action_share -> shareManga()
             R.id.action_delete -> {
                 val options = arrayOf(
@@ -2194,6 +2214,115 @@ open class LibraryController(
             selectedMangas.toList().moveCategories(activity) {
                 presenter.updateLibrary()
                 destroyActionModeIfNeeded()
+            }
+        }
+    }
+
+    private fun showAddToCollectionSheet() {
+        val activity = activity ?: return
+        val mangas = selectedMangas.toList()
+        if (mangas.isEmpty()) return
+        viewScope.launchIO {
+            val collections = getCollections.await()
+            withUIContext {
+                if (collections.isEmpty()) {
+                    promptNewCollection(mangas)
+                    return@withUIContext
+                }
+                val names = collections.map { it.name }.toTypedArray()
+                val checked = BooleanArray(collections.size)
+                if (mangas.size == 1) {
+                    val mangaId = mangas.first().id
+                    if (mangaId != null) {
+                        val memberIds = getCollections.awaitCollectionIdsByMangaId(mangaId).toSet()
+                        collections.forEachIndexed { index, collection ->
+                            checked[index] = collection.id?.toLong() in memberIds
+                        }
+                    }
+                }
+                activity.materialAlertDialog()
+                    .setTitle(MR.strings.add_to_collection)
+                    .setMultiChoiceItems(names, checked) { _, which, isChecked ->
+                        checked[which] = isChecked
+                    }
+                    .setNeutralButton(MR.strings.new_collection) { _, _ ->
+                        promptNewCollection(mangas)
+                    }
+                    .setPositiveButton(MR.strings.save) { _, _ ->
+                        viewScope.launchIO {
+                            mangas.mapNotNull { it.id }.forEach { mangaId ->
+                                collections.forEachIndexed { index, collection ->
+                                    val collectionId = collection.id?.toLong() ?: return@forEachIndexed
+                                    if (checked[index]) {
+                                        setMangaCollections.add(collectionId, mangaId)
+                                    } else if (mangas.size == 1) {
+                                        setMangaCollections.remove(collectionId, mangaId)
+                                    }
+                                }
+                            }
+                            withUIContext {
+                                destroyActionModeIfNeeded()
+                                snack?.dismiss()
+                                snack = view?.snack(MR.strings.added_to_collection)
+                            }
+                        }
+                    }
+                    .setNegativeButton(AR.string.cancel, null)
+                    .show()
+            }
+        }
+    }
+
+    private fun promptNewCollection(mangas: List<Manga>) {
+        val activity = activity ?: return
+        val editText = EditText(activity).apply {
+            hint = activity.getString(MR.strings.collection_name)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+        }
+        val container = FrameLayout(activity).apply {
+            val padding = 16.dpToPx
+            setPadding(padding, 0, padding, 0)
+            addView(editText)
+        }
+        activity.materialAlertDialog()
+            .setTitle(MR.strings.new_collection)
+            .setView(container)
+            .setPositiveButton(MR.strings.save) { _, _ ->
+                val name = editText.text.toString().trim()
+                if (name.isNotBlank()) createCollectionAndAdd(name, mangas)
+            }
+            .setNegativeButton(AR.string.cancel, null)
+            .show()
+    }
+
+    private fun createCollectionAndAdd(name: String, mangas: List<Manga>) {
+        viewScope.launchIO {
+            val existing = getCollections.await()
+            val match = existing.firstOrNull { it.name.equals(name, ignoreCase = true) }
+            val collectionId = match?.id?.toLong() ?: run {
+                val collection = LibraryCollection.create(name).apply {
+                    order = (existing.maxOfOrNull { it.order } ?: 0) + 1
+                }
+                insertCollection.await(collection)
+            } ?: return@launchIO
+            mangas.mapNotNull { it.id }.forEach { setMangaCollections.add(collectionId, it) }
+            withUIContext {
+                destroyActionModeIfNeeded()
+                snack?.dismiss()
+                snack = view?.snack(MR.strings.added_to_collection)
+            }
+        }
+    }
+
+    private fun removeSelectedFromCollection() {
+        val collectionId = (this as? CollectionLibraryController)?.collectionId ?: return
+        val mangas = selectedMangas.toList()
+        viewScope.launchIO {
+            mangas.mapNotNull { it.id }.forEach { setMangaCollections.remove(collectionId, it) }
+            withUIContext {
+                destroyActionModeIfNeeded()
+                snack?.dismiss()
+                snack = view?.snack(MR.strings.removed_from_collection)
             }
         }
     }
