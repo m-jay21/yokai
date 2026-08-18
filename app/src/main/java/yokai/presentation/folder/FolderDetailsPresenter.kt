@@ -14,6 +14,7 @@ import eu.kanade.tachiyomi.domain.manga.models.Manga
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceManager
 import eu.kanade.tachiyomi.source.model.SManga
+import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.base.presenter.BaseCoroutinePresenter
 import eu.kanade.tachiyomi.ui.manga.MangaDetailsData
 import eu.kanade.tachiyomi.ui.manga.MangaHeaderItem
@@ -307,6 +308,25 @@ class FolderDetailsPresenter(
             setFolderChapters.remove(folderId, chapterId)
             load()
         }
+    }
+
+    fun moveChapterToEdge(item: ChapterItem, toTop: Boolean) {
+        val chapterId = item.chapter.id ?: return
+        val current = allChapters.mapNotNull { it.chapter.id }.toMutableList()
+        if (!current.remove(chapterId)) return
+        if (toTop) current.add(0, chapterId) else current.add(chapterId)
+        reorderChapters(current)
+    }
+
+    fun getChapterUrl(item: ChapterItem): String? {
+        val source = sourceManager.get(item.manga.source) as? HttpSource ?: return null
+        val chapterUrl = try { source.getChapterUrl(item.chapter) } catch (_: Exception) { null }
+        return chapterUrl.takeIf { !it.isNullOrBlank() }
+            ?: try { source.getChapterUrl(item.manga, item.chapter) } catch (_: Exception) { null }
+    }
+
+    fun getHttpSourceId(item: ChapterItem): Long? {
+        return (sourceManager.get(item.manga.source) as? HttpSource)?.id
     }
 
     fun markChaptersRead(items: List<ChapterItem>, read: Boolean) {

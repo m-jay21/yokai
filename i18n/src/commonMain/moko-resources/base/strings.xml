@@ -255,6 +255,8 @@
     <string name="new_folder">New folder</string>
     <string name="folder_name">Folder name</string>
     <string name="added_to_folder">Added to folder</string>
+    <string name="remove_from_folder">Remove from folder</string>
+    <string name="removed_from_folder">Removed from folder</string>
     <string name="new_subfolder">New subfolder</string>
     <string name="edit_folder_details">Edit folder details</string>
     <string name="genres">Genres</string>

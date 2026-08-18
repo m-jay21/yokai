@@ -21,6 +21,8 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.annotation.ColorInt
 import androidx.annotation.FloatRange
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.view.ActionMode
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -44,12 +46,16 @@ import com.bluelinelabs.conductor.ControllerChangeType
 import com.google.android.material.snackbar.Snackbar
 import dev.icerock.moko.resources.StringResource
 import eu.davidea.flexibleadapter.FlexibleAdapter
+import eu.davidea.flexibleadapter.SelectableAdapter
+import eu.kanade.tachiyomi.data.download.model.Download
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.coil.getBestColor
 import eu.kanade.tachiyomi.data.database.models.vibrantCoverColor
 import eu.kanade.tachiyomi.databinding.MangaDetailsControllerBinding
+import eu.kanade.tachiyomi.ui.base.MaterialMenuSheet
 import eu.kanade.tachiyomi.ui.base.SmallToolbarInterface
 import eu.kanade.tachiyomi.ui.base.controller.BaseCoroutineController
+import eu.kanade.tachiyomi.ui.base.holder.BaseFlexibleViewHolder
 import eu.kanade.tachiyomi.ui.manga.MangaDetailsAdapter
 import eu.kanade.tachiyomi.ui.manga.MangaDetailsData
 import eu.kanade.tachiyomi.ui.manga.MangaDetailsDivider
@@ -59,6 +65,7 @@ import eu.kanade.tachiyomi.ui.manga.MangaHeaderItem
 import eu.kanade.tachiyomi.ui.manga.chapter.ChapterHolder
 import eu.kanade.tachiyomi.ui.manga.chapter.ChapterItem
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
+import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 import eu.kanade.tachiyomi.util.system.contextCompatColor
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.getResourceColor
@@ -68,6 +75,7 @@ import eu.kanade.tachiyomi.util.system.isLandscape
 import eu.kanade.tachiyomi.util.system.isTablet
 import eu.kanade.tachiyomi.util.system.materialAlertDialog
 import eu.kanade.tachiyomi.util.system.rootWindowInsetsCompat
+import eu.kanade.tachiyomi.util.system.isOnline
 import eu.kanade.tachiyomi.util.system.toast
 import eu.kanade.tachiyomi.util.view.activityBinding
 import eu.kanade.tachiyomi.util.view.isControllerVisible
@@ -96,7 +104,9 @@ class FolderDetailsController :
     MangaDetailsHost,
     SmallToolbarInterface,
     FlexibleAdapter.OnItemClickListener,
-    FlexibleAdapter.OnItemMoveListener {
+    FlexibleAdapter.OnItemLongClickListener,
+    FlexibleAdapter.OnItemMoveListener,
+    ActionMode.Callback {
 
     constructor(folderId: Long) : super(
         Bundle().apply { putLong(FOLDER_EXTRA, folderId) },
@@ -129,6 +139,9 @@ class FolderDetailsController :
     private var chapterPopupMenu: PopupMenu? = null
     private var snack: Snackbar? = null
     private var pendingCoverUri: Uri? = null
+    private var actionMode: ActionMode? = null
+    private var startingRangeChapterPos: Int? = null
+    private var rangeMode: RangeMode? = null
 
     override fun getTitle(): String? =
         if (::presenter.isInitialized && presenter.isFolderLoaded()) presenter.folder.name else null
@@ -200,7 +213,7 @@ class FolderDetailsController :
         adapter = MangaDetailsAdapter(this)
         binding.recycler.adapter = adapter
         adapter?.isSwipeEnabled = true
-        adapter?.isHandleDragEnabled = true
+        configureChapterDrag()
         binding.recycler.layoutManager = LinearLayoutManagerAccurateOffset(view.context)
         binding.recycler.addItemDecoration(MangaDetailsDivider(view.context))
         binding.recycler.setHasFixedSize(true)
@@ -302,7 +315,13 @@ class FolderDetailsController :
         updateMenuVisibility(activityBinding?.toolbar?.menu)
     }
 
+    private fun configureChapterDrag() {
+        adapter?.isLongPressDragEnabled = false
+        adapter?.isHandleDragEnabled = presenter.freeMovementEnabled
+    }
+
     fun updateChapters() {
+        configureChapterDrag()
         adapter?.setChapters(presenter.chapters)
         addFolderHeader()
         tabletAdapter?.notifyItemChanged(0)
@@ -519,8 +538,159 @@ class FolderDetailsController :
 
     override fun onItemClick(view: View?, position: Int): Boolean {
         val item = adapter?.getItem(position) as? ChapterItem ?: return false
+        if (actionMode != null) {
+            completeRangeSelection(position)
+            return false
+        }
         openChapter(item)
         return false
+    }
+
+    override fun onItemLongClick(position: Int) {
+        if (actionMode != null || isDragging) return
+        val adapter = adapter ?: return
+        val item = adapter.getItem(position) as? ChapterItem ?: return
+        val allIds = presenter.allChapters.mapNotNull { it.chapter.id }
+        val chapterId = item.chapter.id
+        val items = mutableListOf(
+            MaterialMenuSheet.MenuSheetItem(
+                MENU_MARK_PREVIOUS_READ,
+                R.drawable.ic_eye_up_24dp,
+                MR.strings.mark_previous_as_read,
+            ),
+            MaterialMenuSheet.MenuSheetItem(
+                MENU_MARK_PREVIOUS_UNREAD,
+                R.drawable.ic_eye_off_up_24dp,
+                MR.strings.mark_previous_as_unread,
+            ),
+            MaterialMenuSheet.MenuSheetItem(
+                MENU_MARK_RANGE_READ,
+                R.drawable.ic_eye_range_24dp,
+                MR.strings.mark_range_as_read,
+            ),
+            MaterialMenuSheet.MenuSheetItem(
+                MENU_MARK_RANGE_UNREAD,
+                R.drawable.ic_eye_off_range_24dp,
+                MR.strings.mark_range_as_unread,
+            ),
+        )
+        if (chapterId != null && chapterId != allIds.firstOrNull()) {
+            items.add(
+                MaterialMenuSheet.MenuSheetItem(
+                    MENU_MOVE_TOP,
+                    R.drawable.ic_arrow_upward_24dp,
+                    MR.strings.move_to_top,
+                ),
+            )
+        }
+        if (chapterId != null && chapterId != allIds.lastOrNull()) {
+            items.add(
+                MaterialMenuSheet.MenuSheetItem(
+                    MENU_MOVE_BOTTOM,
+                    R.drawable.ic_arrow_downward_24dp,
+                    MR.strings.move_to_bottom,
+                ),
+            )
+        }
+        items.add(
+            MaterialMenuSheet.MenuSheetItem(
+                MENU_REMOVE,
+                R.drawable.ic_delete_24dp,
+                MR.strings.remove_from_folder,
+            ),
+        )
+        if (presenter.getChapterUrl(item) != null) {
+            items.add(
+                0,
+                MaterialMenuSheet.MenuSheetItem(
+                    MENU_WEBVIEW,
+                    R.drawable.ic_open_in_webview_24dp,
+                    MR.strings.open_in_webview,
+                ),
+            )
+        }
+        MaterialMenuSheet(activity!!, items, item.name) { _, itemId ->
+            when (itemId) {
+                MENU_MARK_PREVIOUS_READ -> markPreviousAs(item, true)
+                MENU_MARK_PREVIOUS_UNREAD -> markPreviousAs(item, false)
+                MENU_MARK_RANGE_READ -> startReadRange(position, RangeMode.Read)
+                MENU_MARK_RANGE_UNREAD -> startReadRange(position, RangeMode.Unread)
+                MENU_WEBVIEW -> openChapterInWebView(item)
+                MENU_MOVE_TOP -> presenter.moveChapterToEdge(item, toTop = true)
+                MENU_MOVE_BOTTOM -> presenter.moveChapterToEdge(item, toTop = false)
+                MENU_REMOVE -> {
+                    presenter.removeChapterFromFolder(item)
+                    snack?.dismiss()
+                    snack = view?.snack(MR.strings.removed_from_folder)
+                }
+            }
+            true
+        }.show()
+    }
+
+    private fun markPreviousAs(chapter: ChapterItem, read: Boolean) {
+        val chapters = adapter?.currentItems?.filterIsInstance<ChapterItem>().orEmpty()
+        val chapterPos = chapters.indexOf(chapter)
+        if (chapterPos > 0) {
+            presenter.markChaptersRead(chapters.take(chapterPos), read)
+        }
+    }
+
+    private fun startReadRange(position: Int, mode: RangeMode) {
+        createActionModeIfNeeded()
+        rangeMode = mode
+        onItemClick(null, position)
+    }
+
+    private fun completeRangeSelection(position: Int) {
+        if (startingRangeChapterPos == null) {
+            adapter?.addSelection(position)
+            (binding.recycler.findViewHolderForAdapterPosition(position) as? BaseFlexibleViewHolder)
+                ?.toggleActivation()
+            (binding.recycler.findViewHolderForAdapterPosition(position) as? ChapterHolder)
+                ?.notifyStatus(Download.State.CHECKED, false, 0)
+            startingRangeChapterPos = position
+            actionMode?.invalidate()
+            return
+        }
+        val rangeMode = rangeMode ?: return
+        val startingPosition = startingRangeChapterPos ?: return
+        val chapters = adapter?.currentItems?.filterIsInstance<ChapterItem>().orEmpty()
+        val from = minOf(startingPosition, position) - 1
+        val to = maxOf(startingPosition, position)
+        if (from !in chapters.indices || to > chapters.size || from >= to) {
+            destroyActionModeIfNeeded()
+            return
+        }
+        val chapterList = chapters.subList(from, to)
+        when (rangeMode) {
+            RangeMode.Read -> presenter.markChaptersRead(chapterList, true)
+            RangeMode.Unread -> presenter.markChaptersRead(chapterList, false)
+        }
+        adapter?.removeSelection(startingPosition)
+        (binding.recycler.findViewHolderForAdapterPosition(startingPosition) as? BaseFlexibleViewHolder)
+            ?.toggleActivation()
+        startingRangeChapterPos = null
+        this.rangeMode = null
+        destroyActionModeIfNeeded()
+    }
+
+    private fun openChapterInWebView(item: ChapterItem) {
+        val activity = activity ?: return
+        if (!activity.isOnline()) {
+            view?.snack(MR.strings.no_network_connection)
+            return
+        }
+        val url = presenter.getChapterUrl(item) ?: return
+        val sourceId = presenter.getHttpSourceId(item) ?: return
+        startActivity(
+            WebViewActivity.newIntent(
+                activity.applicationContext,
+                url,
+                sourceId,
+                item.manga.title,
+            ),
+        )
     }
 
     private fun openChapter(item: ChapterItem) {
@@ -711,7 +881,7 @@ class FolderDetailsController :
                     2 -> presenter.cycleBookmarkedFilter()
                     3 -> {
                         presenter.toggleFreeMovement()
-                        adapter?.isHandleDragEnabled = presenter.freeMovementEnabled
+                        configureChapterDrag()
                         adapter?.notifyDataSetChanged()
                     }
                 }
@@ -763,6 +933,7 @@ class FolderDetailsController :
 
     // region drag to reorder
     override fun onActionStateChanged(viewHolder: RecyclerView.ViewHolder?, actionState: Int) {
+        isDragging = actionState == ItemTouchHelper.ACTION_STATE_DRAG
         binding.swipeRefresh.isEnabled = actionState == ItemTouchHelper.ACTION_STATE_IDLE
     }
 
@@ -773,8 +944,56 @@ class FolderDetailsController :
     }
     // endregion
 
+    // region range selection
+    private fun createActionModeIfNeeded() {
+        if (actionMode == null) {
+            actionMode = (activity as? AppCompatActivity)?.startSupportActionMode(this) ?: return
+            if (adapter?.mode != SelectableAdapter.Mode.MULTI) {
+                adapter?.mode = SelectableAdapter.Mode.MULTI
+            }
+        }
+    }
+
+    private fun destroyActionModeIfNeeded() {
+        actionMode?.finish()
+    }
+
+    override fun onCreateActionMode(mode: ActionMode?, menu: Menu?): Boolean = true
+
+    override fun onPrepareActionMode(mode: ActionMode?, menu: Menu?): Boolean {
+        mode?.title = view?.context?.getString(
+            if (startingRangeChapterPos == null) {
+                MR.strings.select_starting_chapter
+            } else {
+                MR.strings.select_ending_chapter
+            },
+        )
+        return false
+    }
+
+    override fun onActionItemClicked(mode: ActionMode?, item: MenuItem?): Boolean = true
+
+    override fun onDestroyActionMode(mode: ActionMode?) {
+        actionMode = null
+        rangeMode = null
+        startingRangeChapterPos = null
+        adapter?.mode = SelectableAdapter.Mode.IDLE
+        adapter?.clearSelection()
+    }
+    // endregion
+
     companion object {
         const val FOLDER_EXTRA = "folder"
         private const val REQUEST_COVER = 201
+        private const val MENU_MARK_PREVIOUS_READ = 0
+        private const val MENU_MARK_PREVIOUS_UNREAD = 1
+        private const val MENU_MARK_RANGE_READ = 2
+        private const val MENU_MARK_RANGE_UNREAD = 3
+        private const val MENU_WEBVIEW = 4
+        private const val MENU_MOVE_TOP = 5
+        private const val MENU_MOVE_BOTTOM = 6
+        private const val MENU_REMOVE = 7
     }
+
+    private enum class RangeMode { Read, Unread }
 }
