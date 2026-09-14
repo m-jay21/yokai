@@ -21,13 +21,13 @@ A free and open source manga reader — fork with custom **Folders** for multi-s
 
 Build from source, or install a local variant such as **YōkaiJ** (`./gradlew :app:installStandardYokaij`).
 
-*Requires Android 6.0 or higher.*
+*Requires Android 8.0 or higher.*
 
 ## About this fork
 
-Personal fork of [null2264/yokai](https://github.com/null2264/yokai) focused on **Folders**: group chapters from multiple series into one place, reorder them freely, and manage them with a details UI that matches the series page (including cover-based theming and tablet layout).
+Personal fork of [null2264/yokai](https://github.com/null2264/yokai) focused on **Folders** and **Collections**: group chapters from multiple series into folder playlists, or group whole series into mini-libraries, with details/library UI that matches the rest of the app.
 
-Also includes folder backup/restore, a **YōkaiJ** side-by-side build variant (release-style, no reader debug overlay), and a Glance widget crash fix on some Samsung devices.
+Also includes folder/collection backup/restore, a **YōkaiJ** side-by-side build variant (release-style, no reader debug overlay), and a Glance widget crash fix on some Samsung devices.
 
 ## Features
 
@@ -37,10 +37,11 @@ Also includes folder backup/restore, a **YōkaiJ** side-by-side build variant (r
     <summary><h3>From this fork</h3></summary>
 
 * **Folders** — create collections of chapters across different series.
+* **Collections** — mini-libraries of series with the same cover grid UI as the main library.
 * Folder details screen aligned with series details (cover palette theming, tablet split layout).
 * Manual chapter reorder with optional free-movement drag handles.
 * Folder metadata (name, description, author/artist, tags, custom cover).
-* Folders included in create/restore backup.
+* Folders and collections included in create/restore backup.
 * **YōkaiJ** build type for a release-style install next to stock Yōkai (`eu.kanade.tachiyomi.yokaij`).
 * Fix for Glance widget startup crash (`SecurityException` on some devices).
 
